@@ -1,0 +1,139 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+
+#include "VRCharacter.h"
+
+#include "Camera/CameraComponent.h"
+#include "Components/InputComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "NavigationSystem.h"
+
+#include <iostream>
+#include <string>
+#include <string.h>
+
+using namespace std;
+
+// Sets default values
+AVRCharacter::AVRCharacter()
+{
+ 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	PrimaryActorTick.bCanEverTick = true;
+
+	VRRot = CreateDefaultSubobject<USceneComponent>(TEXT("VRRot"));
+	VRRot->SetupAttachment(GetRootComponent());
+
+	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+	Camera->SetupAttachment(VRRot);
+
+	DestinationMarker = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DestinationMarker"));
+	DestinationMarker->SetupAttachment(GetRootComponent());
+	
+}
+
+// Called when the game starts or when spawned
+void AVRCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	DestinationMarker->SetVisibility(false);
+}
+
+// Called every frame
+void AVRCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	FVector NewCameraOffset = Camera->GetComponentLocation() - GetActorLocation();
+	NewCameraOffset.Z = 0;
+	//FVector::VectorPlaneProject
+	AddActorWorldOffset(NewCameraOffset);
+	VRRot->AddWorldOffset(-NewCameraOffset);
+
+	UpdateDestinationMarker();
+
+}
+
+// Called to bind functionality to input
+void AVRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+	PlayerInputComponent->BindAxis(TEXT("Forward"), this, &AVRCharacter::MoveForward);
+	PlayerInputComponent->BindAxis(TEXT("Right"), this, &AVRCharacter::MoveRight);
+	PlayerInputComponent->BindAction(TEXT("Teleport"),IE_Released, this, &AVRCharacter::BeginTeleport);
+}
+
+bool AVRCharacter::FindTeleportDestination(FVector& OutLocation)
+{
+	FVector Start = Camera->GetComponentLocation();
+	FVector End = Start + Camera->GetForwardVector() * MaxTeleportDistance;
+
+	FHitResult HitResult;
+	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility);
+
+	if (!bHit) return false;
+	/*const UNavigationSystemV1* navSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(this);
+	bool bOnNavMesh = navSystem->ProjectPointToNavigation(HitResult.Location, NavLocation, TeleportProjectionExtent);*/
+
+	FNavLocation NavLocation;
+	bool bOnNavMesh = UNavigationSystemV1::GetCurrent(GetWorld())->ProjectPointToNavigation(HitResult.Location, NavLocation, TeleportProjectionExtent);
+	
+	if (!bOnNavMesh) return false;
+	
+	OutLocation = NavLocation;
+
+	return true;
+}
+
+void AVRCharacter::MoveForward(float aceleracion)
+{
+	AddMovementInput(Camera->GetForwardVector() * aceleracion);
+}
+
+void AVRCharacter::MoveRight(float aceleracion)
+{
+	//int intVar = 5;
+	//float floatVar = 3.7f;
+	//FString fstringVar = "an fstring variable"; imprime con *fstringVar
+	UE_LOG(LogTemp, Warning, TEXT("Aceleracion: %f"), aceleracion);
+
+	AddMovementInput(Camera->GetRightVector() * aceleracion);
+}
+
+void AVRCharacter::UpdateDestinationMarker()
+{
+	FVector Location;
+	bool bHasDestination = FindTeleportDestination(Location);
+	
+	if (bHasDestination)
+	{
+		DestinationMarker->SetVisibility(true);
+		DestinationMarker->SetWorldLocation(Location);
+	}
+	else
+	{
+		DestinationMarker->SetVisibility(false);
+	}
+}
+
+void AVRCharacter::BeginTeleport()
+{
+	StartFade(0, 1);
+	FTimerHandle Handle;
+	GetWorldTimerManager().SetTimer(Handle, this, &AVRCharacter::FinishTeleport, TeleportFadeTime);
+}
+
+void AVRCharacter::FinishTeleport()
+{
+	SetActorLocation(DestinationMarker->GetComponentLocation() + GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	StartFade(1, 0);
+}
+
+void AVRCharacter::StartFade(float FromAlpha, float ToAlpha)
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (PC != nullptr)
+	{
+		PC->PlayerCameraManager->StartCameraFade(FromAlpha, ToAlpha, TeleportFadeTime, FLinearColor::Black);
+	}
+}
