@@ -19,7 +19,7 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:	
+public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
@@ -27,8 +27,7 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 private:
-
-	bool FindTeleportDestination(FVector &OutLocation);
+	bool FindTeleportDestination(FVector& OutLocation);
 	void MoveForward(float cantidad);
 
 	void MoveRight(float cantidad);
@@ -46,13 +45,21 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	class UStaticMeshComponent* DestinationMarker;
 
+	UPROPERTY()
+	class UPostProcessComponent* PostProcessComponent;
+
+	UPROPERTY()
+	class UMaterialInstanceDynamic* BlinkerMaterialInstance;
+
 	UPROPERTY(EditAnywhere)
 	float MaxTeleportDistance = 1000;
-	
+
 	UPROPERTY(EditAnywhere)
 	float TeleportFadeTime = 1;
 
 	UPROPERTY(EditAnywhere)
 	FVector TeleportProjectionExtent = FVector(100, 100, 100);
 
+	UPROPERTY(EditAnywhere)
+	class UMaterialInterface * BlinkerMaterialBase;
 };
