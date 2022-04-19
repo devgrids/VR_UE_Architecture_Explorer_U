@@ -32,7 +32,9 @@ private:
 
 	void MoveRight(float cantidad);
 	void UpdateDestinationMarker();
+	
 	void UpdateBlinkers();
+	FVector2D GetBlinkerCentre();
 
 	void BeginTeleport();
 	void FinishTeleport();
