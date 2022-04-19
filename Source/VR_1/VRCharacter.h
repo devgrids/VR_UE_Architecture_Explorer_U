@@ -32,6 +32,7 @@ private:
 
 	void MoveRight(float cantidad);
 	void UpdateDestinationMarker();
+	void UpdateBlinkers();
 
 	void BeginTeleport();
 	void FinishTeleport();
@@ -61,5 +62,8 @@ private:
 	FVector TeleportProjectionExtent = FVector(100, 100, 100);
 
 	UPROPERTY(EditAnywhere)
-	class UMaterialInterface * BlinkerMaterialBase;
+	class UMaterialInterface* BlinkerMaterialBase;
+
+	UPROPERTY(EditAnywhere)
+	class UCurveFloat* RadiusVsVelocity;
 };
