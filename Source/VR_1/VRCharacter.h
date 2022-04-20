@@ -32,7 +32,7 @@ private:
 
 	void MoveRight(float cantidad);
 	void UpdateDestinationMarker();
-	
+
 	void UpdateBlinkers();
 	FVector2D GetBlinkerCentre();
 
@@ -43,8 +43,16 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	class UCameraComponent* Camera;
+	
 	UPROPERTY()
-	class USceneComponent* VRRot;
+	class UMotionControllerComponent* LeftController;
+	
+	UPROPERTY()
+	class UMotionControllerComponent* RightController;
+	
+	UPROPERTY()
+	class USceneComponent* VRRoot;
+	
 	UPROPERTY(VisibleAnywhere)
 	class UStaticMeshComponent* DestinationMarker;
 

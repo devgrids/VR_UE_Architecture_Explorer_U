@@ -10,31 +10,33 @@
 #include "NavigationSystem.h"
 #include "Components/PostProcessComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
-
-#include <iostream>
-#include <string>
-#include <string.h>
-
-using namespace std;
+#include "MotionControllerComponent.h"
 
 // Sets default values
 AVRCharacter::AVRCharacter()
 {
- 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	VRRot = CreateDefaultSubobject<USceneComponent>(TEXT("VRRot"));
-	VRRot->SetupAttachment(GetRootComponent());
+	VRRoot = CreateDefaultSubobject<USceneComponent>(TEXT("VRRot"));
+	VRRoot->SetupAttachment(GetRootComponent());
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
-	Camera->SetupAttachment(VRRot);
+	Camera->SetupAttachment(VRRoot);
+
+	LeftController = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("LeftController"));
+	LeftController->SetupAttachment(VRRoot);
+	LeftController->Hand_DEPRECATED = EControllerHand::Left;
+
+	RightController = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("RightController"));
+	RightController->SetupAttachment(VRRoot);
+	RightController->Hand_DEPRECATED = EControllerHand::Right;
 
 	DestinationMarker = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DestinationMarker"));
 	DestinationMarker->SetupAttachment(GetRootComponent());
-	
+
 	PostProcessComponent = CreateDefaultSubobject<UPostProcessComponent>(TEXT("PostProcessComponent"));
 	PostProcessComponent->SetupAttachment(GetRootComponent());
-	
 }
 
 // Called when the game starts or when spawned
@@ -43,7 +45,7 @@ void AVRCharacter::BeginPlay()
 	Super::BeginPlay();
 	DestinationMarker->SetVisibility(false);
 
-	
+
 	if (BlinkerMaterialBase != nullptr)
 	{
 		BlinkerMaterialInstance = UMaterialInstanceDynamic::Create(BlinkerMaterialBase, this);
@@ -60,11 +62,10 @@ void AVRCharacter::Tick(float DeltaTime)
 	NewCameraOffset.Z = 0;
 	//FVector::VectorPlaneProject
 	AddActorWorldOffset(NewCameraOffset);
-	VRRot->AddWorldOffset(-NewCameraOffset);
+	VRRoot->AddWorldOffset(-NewCameraOffset);
 
 	UpdateDestinationMarker();
 	UpdateBlinkers();
-
 }
 
 // Called to bind functionality to input
@@ -73,13 +74,18 @@ void AVRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 	PlayerInputComponent->BindAxis(TEXT("Forward"), this, &AVRCharacter::MoveForward);
 	PlayerInputComponent->BindAxis(TEXT("Right"), this, &AVRCharacter::MoveRight);
-	PlayerInputComponent->BindAction(TEXT("Teleport"),IE_Released, this, &AVRCharacter::BeginTeleport);
+	PlayerInputComponent->BindAction(TEXT("Teleport"), IE_Released, this, &AVRCharacter::BeginTeleport);
 }
 
 bool AVRCharacter::FindTeleportDestination(FVector& OutLocation)
 {
 	FVector Start = Camera->GetComponentLocation();
 	FVector End = Start + Camera->GetForwardVector() * MaxTeleportDistance;
+
+	// FVector Start = RightController->GetComponentLocation();
+	// FVector Look = RightController->GetForwardVector();
+	// Look = Look.RotateAngleAxis(30, RightController->GetRightVector());
+	// FVector End = Start + Look * MaxTeleportDistance;
 
 	FHitResult HitResult;
 	bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility);
@@ -89,10 +95,11 @@ bool AVRCharacter::FindTeleportDestination(FVector& OutLocation)
 	bool bOnNavMesh = navSystem->ProjectPointToNavigation(HitResult.Location, NavLocation, TeleportProjectionExtent);*/
 
 	FNavLocation NavLocation;
-	bool bOnNavMesh = UNavigationSystemV1::GetCurrent(GetWorld())->ProjectPointToNavigation(HitResult.Location, NavLocation, TeleportProjectionExtent);
-	
+	bool bOnNavMesh = UNavigationSystemV1::GetCurrent(GetWorld())->ProjectPointToNavigation(
+		HitResult.Location, NavLocation, TeleportProjectionExtent);
+
 	if (!bOnNavMesh) return false;
-	
+
 	OutLocation = NavLocation;
 
 	return true;
@@ -117,7 +124,7 @@ void AVRCharacter::UpdateDestinationMarker()
 {
 	FVector Location;
 	bool bHasDestination = FindTeleportDestination(Location);
-	
+
 	if (bHasDestination)
 	{
 		DestinationMarker->SetVisibility(true);
@@ -153,11 +160,11 @@ FVector2D AVRCharacter::GetBlinkerCentre()
 	FVector WorldStationaryLocation;
 	if (FVector::DotProduct(Camera->GetForwardVector(), MovementDirection) > 0)
 	{
-		WorldStationaryLocation = Camera->GetComponentLocation() + MovementDirection * 1000;
+		WorldStationaryLocation = Camera->GetComponentLocation() + MovementDirection * MaxTeleportDistance;
 	}
 	else
 	{
-		WorldStationaryLocation = Camera->GetComponentLocation() - MovementDirection * 1000;
+		WorldStationaryLocation = Camera->GetComponentLocation() - MovementDirection * MaxTeleportDistance;
 	}
 
 	APlayerController* PC = Cast<APlayerController>(GetController());
